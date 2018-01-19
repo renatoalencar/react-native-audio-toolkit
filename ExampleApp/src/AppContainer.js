@@ -179,7 +179,7 @@ class AppContainer extends React.Component {
 
   render() {
     return (
-      <View>
+      <View style={{ height: 300 }}>
         <View>
           <Text style={styles.title}>
             Playback
