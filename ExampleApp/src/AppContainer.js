@@ -109,7 +109,12 @@ class AppContainer extends React.Component {
     }
 
     this.player = new Player(filename, {
-      autoDestroy: false
+      autoDestroy: false,
+      continuesToPlayInBackground: true,
+      showPlayerNotification: true,
+      appName: 'Lorem ipsum',
+      notificationTitle: 'Lorem ipsum dolor',
+      imageUrl: 'https://ih1.redbubble.net/image.264246449.9046/poster%2C210x230%2Cf8f8f8-pad%2C210x230%2Cf8f8f8.lite-1u1.jpg'
     }).prepare((err) => {
       if (err) {
         console.log('error at _reloadPlayer():');

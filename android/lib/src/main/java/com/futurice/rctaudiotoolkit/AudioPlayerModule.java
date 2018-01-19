@@ -35,17 +35,23 @@ import java.util.Map.Entry;
 public class AudioPlayerModule extends ReactContextBaseJavaModule implements MediaPlayer.OnInfoListener,
         MediaPlayer.OnErrorListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnSeekCompleteListener,
         MediaPlayer.OnBufferingUpdateListener, LifecycleEventListener, AudioManager.OnAudioFocusChangeListener {
-    private static final String LOG_TAG = "AudioPlayerModule";
+    public static final String LOG_TAG = "AudioPlayerModule";
 
     Map<Integer, MediaPlayer> playerPool = new HashMap<>();
     Map<Integer, Boolean> playerAutoDestroy = new HashMap<>();
     Map<Integer, Boolean> playerContinueInBackground = new HashMap<>();
     Map<Integer, Callback> playerSeekCallback = new HashMap<>();
+    Map<Integer, Map<String, String>> playerNotificationOptions = new HashMap<>();
 
     boolean looping = false;
     private ReactApplicationContext context;
     private AudioManager mAudioManager;
     private Integer lastPlayerId;
+
+    private class CallbackNoop implements Callback {
+      @Override
+      public void invoke(Object... args) {}
+    }
 
     public AudioPlayerModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -149,7 +155,7 @@ public class AudioPlayerModule extends ReactContextBaseJavaModule implements Med
         if (file.exists()) {
             return Uri.fromFile(file);
         }
-        
+
         // Try finding file in Android "raw" resources
         if (path.lastIndexOf('.') != -1) {
             fileNameWithoutExt = path.substring(0, path.lastIndexOf('.'));
@@ -286,8 +292,24 @@ public class AudioPlayerModule extends ReactContextBaseJavaModule implements Med
             continueInBackground = options.getBoolean("continuesToPlayInBackground");
         }
 
+        boolean showPlayerNotification = false;
+        Map<String, String> notificationOptions = null;
+
+        if (options.hasKey("showPlayerNotification")) {
+            showPlayerNotification = options.getBoolean("showPlayerNotification");
+        }
+
         this.playerAutoDestroy.put(playerId, autoDestroy);
         this.playerContinueInBackground.put(playerId, continueInBackground);
+
+        if (showPlayerNotification) {
+          notificationOptions = new HashMap<>();
+          notificationOptions.put("appName", options.getString("appName"));
+          notificationOptions.put("title", options.getString("notificationTitle"));
+          notificationOptions.put("imageUrl", options.getString("imageUrl"));
+        }
+
+        this.playerNotificationOptions.put(playerId, notificationOptions);
 
         try {
             player.prepareAsync();
@@ -357,6 +379,16 @@ public class AudioPlayerModule extends ReactContextBaseJavaModule implements Med
         try {
             this.mAudioManager.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
             player.start();
+
+            Map<String, String> notificationOptions = this.playerNotificationOptions.get(playerId);
+            if (notificationOptions != null) {
+              createPlayerNotification(
+                playerId,
+                notificationOptions.get("appName"),
+                notificationOptions.get("title"),
+                notificationOptions.get("imageUrl")
+              );
+            }
 
             callback.invoke(null, getInfo(player));
         } catch (Exception e) {
@@ -543,5 +575,13 @@ public class AudioPlayerModule extends ReactContextBaseJavaModule implements Med
     // Utils
     public static boolean equals(Object a, Object b) {
         return (a == b) || (a != null && a.equals(b));
+    }
+
+    private void createPlayerNotification(Integer playerId, String appName, String title, String imageUrl) {
+      MediaPlayer player = playerPool.get(playerId);
+
+      new PlayerNotification(context, player)
+        .build(appName, title, imageUrl, true)
+        .present();
     }
 }
